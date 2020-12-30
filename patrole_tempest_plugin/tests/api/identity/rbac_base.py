@@ -77,7 +77,7 @@ class BaseIdentityRbacTest(rbac_utils.RbacUtilsMixin,
 class BaseIdentityV3RbacTest(BaseIdentityRbacTest):
 
     identity_version = 'v3'
-    credentials = ['primary']
+    credentials = ['primary', 'admin']
 
     @classmethod
     def setup_clients(cls):
