@@ -20,7 +20,6 @@ import fixtures
 import mock
 import time
 
-from tempest.common import credentials_factory as credentials
 from tempest import config
 from tempest import test
 
@@ -56,6 +55,7 @@ class ConfPatcher(fixtures.Fixture):
 
 
 class FakeBaseRbacTest(rbac_utils.RbacUtilsMixin, test.BaseTestCase):
+    credentials = []
     os_primary = None
 
     def runTest(self):
@@ -92,13 +92,20 @@ class RbacUtilsMixinFixture(fixtures.Fixture):
         # time.sleep is a test optimization.
         self.mock_time = self.patchobject(rbac_utils, 'time',
                                           __name__='mock_time', spec=time)
-        self.patchobject(credentials, 'get_configured_admin_credentials',
-                         spec=object)
-        mock_admin_mgr = self.patchobject(rbac_utils.clients, 'Manager',
-                                          spec=rbac_utils.clients.Manager,
-                                          roles_v3_client=mock.Mock(),
-                                          roles_client=mock.Mock())
-        self.admin_roles_client = mock_admin_mgr.return_value.roles_v3_client
+
+        test_obj_kwargs = {
+            'credentials.user_id': self.USER_ID,
+            'credentials.tenant_id': self.PROJECT_ID,
+            'credentials.project_id': self.PROJECT_ID,
+        }
+
+        class FakeRbacTest(FakeBaseRbacTest):
+            os_primary = mock.Mock()
+            os_admin = mock.Mock()
+
+        FakeRbacTest.os_primary.configure_mock(**test_obj_kwargs)
+
+        self.admin_roles_client = FakeRbacTest.os_admin.roles_v3_client
         self.admin_roles_client.list_all_role_inference_rules.return_value = {
             "role_inferences": [
                 {
@@ -116,22 +123,12 @@ class RbacUtilsMixinFixture(fixtures.Fixture):
             set(self._rbac_test_roles))
         self.set_roles(list(default_roles), [])
 
-        test_obj_kwargs = {
-            'credentials.user_id': self.USER_ID,
-            'credentials.tenant_id': self.PROJECT_ID,
-            'credentials.project_id': self.PROJECT_ID,
-        }
-
-        class FakeRbacTest(FakeBaseRbacTest):
-            os_primary = mock.Mock()
-
-        FakeRbacTest.os_primary.configure_mock(**test_obj_kwargs)
-
         FakeRbacTest.setUpClass()
         self.test_obj = FakeRbacTest()
         if self._do_reset_mocks:
             self.admin_roles_client.reset_mock()
             self.test_obj.os_primary.reset_mock()
+            self.test_obj.os_admin.reset_mock()
             self.mock_time.reset_mock()
 
     def set_roles(self, roles, roles_on_project=None):
